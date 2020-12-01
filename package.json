@@ -12,7 +12,7 @@
     "check-formatting": "prettier --check '**/*.{js,json,md,tsx,ts}'"
   },
   "files": [
-    "dist/lib"
+    "dist"
   ],
   "bin": {
     "fast-create": "./dist/fast-create.js"
