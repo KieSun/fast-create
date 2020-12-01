@@ -8,3 +8,5 @@ export enum IConfig {
   'Commitlint',
   'Lerna',
 }
+
+export type IData = { [key: string]: any }

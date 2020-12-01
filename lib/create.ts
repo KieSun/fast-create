@@ -2,7 +2,9 @@ import path from 'path'
 import fs from 'fs-extra'
 import inquirer from 'inquirer'
 import chalk from 'chalk'
-import { IConfig, IOptions } from './types'
+import shell from 'shelljs'
+import { IConfig, IOptions, IData } from './types'
+import { deleteFolder } from './utils'
 
 export default async (name: string | undefined, options: IOptions) => {
   const cwd = process.cwd()
@@ -13,7 +15,7 @@ export default async (name: string | undefined, options: IOptions) => {
   const { force } = options
 
   if (force) {
-    await fs.remove(targetDir)
+    deleteFolder(targetDir)
   }
 
   if (fs.existsSync(targetDir) && !force) {
@@ -49,9 +51,15 @@ export default async (name: string | undefined, options: IOptions) => {
   }
 
   const { choose } = await getConfig()
-  const deps: string[] = []
+  const deps: string[] = ['typescript']
+  const packageJsonData: IData = {}
 
-  await setLintConfig(choose, targetDir, deps)
+  shell.exec('npm init -y')
+  await setCommitlintConfig(choose, targetDir, deps, packageJsonData)
+  await setLintConfig(choose, targetDir, deps, packageJsonData)
+  await setJestConfig(choose, targetDir, deps)
+  await setLernaConfig(choose, deps)
+  await setPackageJsonFile(choose, targetDir, deps, packageJsonData)
 }
 
 const getConfig = () => {
@@ -73,7 +81,8 @@ const getConfig = () => {
 const setLintConfig = async (
   choose: IConfig[],
   targetDir: string,
-  deps: string[]
+  deps: string[],
+  packageJsonData: IData
 ) => {
   if (choose.includes(IConfig['ESLint / Prettier'])) {
     fs.writeJSONSync(
@@ -104,6 +113,15 @@ const setLintConfig = async (
       // @ts-ignore
       eslintData.env.jest = true
     }
+    packageJsonData['husky'] = {
+      ...packageJsonData['husky'],
+      hooks: {
+        'pre-commit': 'lint-staged',
+      },
+    }
+    packageJsonData['lint-staged'] = {
+      '*.{js,json,md,tsx,ts}': ['prettier --write', 'git add'],
+    }
     await fs.writeFile(
       `${targetDir}/.eslintrc.js`,
       `module.exports = ${JSON.stringify(eslintData, null, 2)}`
@@ -113,4 +131,85 @@ const setLintConfig = async (
       ...['eslint', 'eslint-plugin-prettier', 'lint-staged', 'prettier']
     )
   }
+}
+
+const setJestConfig = async (
+  choose: IConfig[],
+  targetDir: string,
+  deps: string[]
+) => {
+  if (choose.includes(IConfig.Jest)) {
+    const jestData = {
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      testMatch: ['**/__tests__/**/*.test.ts?(x)'],
+      testPathIgnorePatterns: [
+        '<rootDir>/dist/',
+        '<rootDir>/node_modules/',
+        '(.*).d.ts',
+      ],
+    }
+    await fs.writeFile(
+      `${targetDir}/jest.config.js`,
+      `module.exports = ${JSON.stringify(jestData, null, 2)}`
+    )
+    deps.push(...['jest', 'ts-jest', '@types/jest'])
+  }
+}
+
+const setCommitlintConfig = async (
+  choose: IConfig[],
+  targetDir: string,
+  deps: string[],
+  packageJsonData: IData
+) => {
+  if (choose.includes(IConfig.Commitlint)) {
+    const lintData = { extends: ['@commitlint/config-conventional'] }
+    await fs.writeFile(
+      `${targetDir}/commitlint.config.js`,
+      `module.exports = ${JSON.stringify(lintData, null, 2)}`
+    )
+    packageJsonData['husky'] = {
+      ...packageJsonData['husky'],
+      hooks: {
+        'commit-msg': 'commitlint -E HUSKY_GIT_PARAMS',
+      },
+    }
+    deps.push(
+      ...['@commitlint/cli', '@commitlint/config-conventional', 'husky']
+    )
+  }
+}
+
+const setLernaConfig = async (choose: IConfig[], deps: string[]) => {
+  if (choose.includes(IConfig.Lerna)) {
+    deps.push(...['lerna'])
+  }
+}
+
+const setPackageJsonFile = async (
+  choose: IConfig[],
+  targetDir: string,
+  deps: string[],
+  packageJsonData: IData
+) => {
+  console.log(chalk.cyan('开始安装依赖'))
+  shell.exec(`yarn add -D ${deps.join(' ')}`)
+  if (choose.includes(IConfig.Lerna)) {
+    shell.exec('npx lerna init')
+  }
+  const filePath = `${targetDir}/package.json`
+  const json = await fs.readJSON(filePath)
+  const data: IData = {
+    test: 'jest',
+    clean: 'rm -rf ./dist',
+    build: 'yarn clean && tsc && chmod +x dist/fast-create.js',
+    prepare: 'yarn build',
+    'check-types': 'tsc --noEmit',
+  }
+  if (choose.includes(IConfig['ESLint / Prettier'])) {
+    data['check-formatting'] = "prettier --check '**/*.{js,json,md,tsx,ts}'"
+  }
+  json['scripts'] = data
+  await fs.writeJSON(filePath, { ...json, ...packageJsonData }, { spaces: 2 })
 }
