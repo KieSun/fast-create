@@ -24,7 +24,9 @@ export default async (name: string | undefined, options: IOptions) => {
         {
           name: 'ok',
           type: 'confirm',
-          message: `是否在当前 ${chalk.cyan(targetDir)} 文件夹中创建项目？`,
+          message: `Whether to create the project in the current ${chalk.cyan(
+            targetDir
+          )} folder or no？`,
         },
       ])
       if (!ok) {
@@ -35,10 +37,12 @@ export default async (name: string | undefined, options: IOptions) => {
         {
           name: 'action',
           type: 'list',
-          message: `当前文件夹 ${chalk.cyan(targetDir)} 已经存在，是否覆盖重写`,
+          message: `The current folder ${chalk.cyan(
+            targetDir
+          )} already exists, whether to overwrite the overwrite?`,
           choices: [
-            { name: '确定', value: true },
-            { name: '取消', value: false },
+            { name: 'confirm', value: true },
+            { name: 'cancel', value: false },
           ],
         },
       ])
@@ -217,7 +221,7 @@ const setPackageJsonFile = async (
   deps: string[],
   packageJsonData: IData
 ) => {
-  console.log(chalk.cyan('开始安装依赖'))
+  console.log(chalk.cyan('Start Installing Dependencies'))
   shell.exec(`yarn add -D ${deps.join(' ')}`, { cwd: targetDir })
   if (choose.includes(IConfig.Lerna)) {
     shell.exec('npx lerna init', { cwd: targetDir })

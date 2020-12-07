@@ -6,8 +6,8 @@ program.version(`fast-create ${require('../package').version}`)
 
 program
   .command('create [name]')
-  .description('创建一个新项目')
-  .option('-f, --force', '如果文件夹存在就覆盖重写')
+  .description('create a new project')
+  .option('-f, --force', 'Overwrite the folder if it exists.')
   .action((name, options) => {
     create(name, options)
   })
