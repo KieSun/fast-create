@@ -1,6 +1,6 @@
 {
   "name": "fast-create",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Command line interface for rapid npm package development",
   "main": "index.js",
   "scripts": {
