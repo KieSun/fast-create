@@ -51,10 +51,11 @@ export default async (name: string | undefined, options: IOptions) => {
   }
 
   const { choose } = await getConfig()
-  const deps: string[] = ['typescript']
+  const deps: string[] = []
   const packageJsonData: IData = {}
 
-  shell.exec('npm init -y')
+  shell.exec('npm init -y', { cwd: targetDir })
+  await setTypescriptConfig(targetDir, deps)
   await setCommitlintConfig(choose, targetDir, deps, packageJsonData)
   await setLintConfig(choose, targetDir, deps, packageJsonData)
   await setJestConfig(choose, targetDir, deps)
@@ -133,6 +134,29 @@ const setLintConfig = async (
   }
 }
 
+const setTypescriptConfig = async (targetDir: string, deps: string[]) => {
+  const filePath = `${targetDir}/tsconfig.json`
+  await fs.writeJSON(
+    filePath,
+    {
+      compilerOptions: {
+        target: 'es5',
+        module: 'commonjs',
+        strict: true,
+        esModuleInterop: true,
+        skipLibCheck: true,
+        baseUrl: '.',
+        noUnusedLocals: true,
+        noUnusedParameters: true,
+        noFallthroughCasesInSwitch: true,
+        outDir: './dist',
+      },
+    },
+    { spaces: 2 }
+  )
+  deps.push('typescript')
+}
+
 const setJestConfig = async (
   choose: IConfig[],
   targetDir: string,
@@ -194,16 +218,16 @@ const setPackageJsonFile = async (
   packageJsonData: IData
 ) => {
   console.log(chalk.cyan('开始安装依赖'))
-  shell.exec(`yarn add -D ${deps.join(' ')}`)
+  shell.exec(`yarn add -D ${deps.join(' ')}`, { cwd: targetDir })
   if (choose.includes(IConfig.Lerna)) {
-    shell.exec('npx lerna init')
+    shell.exec('npx lerna init', { cwd: targetDir })
   }
   const filePath = `${targetDir}/package.json`
   const json = await fs.readJSON(filePath)
   const data: IData = {
     test: 'jest',
     clean: 'rm -rf ./dist',
-    build: 'yarn clean && tsc && chmod +x dist/fast-create.js',
+    build: 'yarn clean && tsc',
     prepare: 'yarn build',
     'check-types': 'tsc --noEmit',
   }
